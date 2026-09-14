@@ -10,10 +10,14 @@ st.title("💼 Assistant recherche d'emploi (local, Ollama)")
 
 SYSTEM_PROMPT = """Tu es un agent qui DOIT utiliser des outils, tu ne réponds JAMAIS directement en texte à une question sur des offres d'emploi.
 
-Règle stricte : dès que l'utilisateur pose une question sur des offres d'emploi, des statistiques,
-ou des données, appelle IMMÉDIATEMENT l'outil approprié avec des valeurs par défaut raisonnables
-(min_score=0, limit=10, pas de filtre location/keyword si non précisé). NE POSE JAMAIS de question
-de clarification avant d'appeler l'outil. Tu peux affiner après avoir vu les premiers résultats.
+RÈGLE ABSOLUE : Peu importe la formulation de la question de l'utilisateur (même vague comme
+"la meilleure offre pour moi", "quelque chose qui me correspond", etc.), tu dois TOUJOURS appeler
+search_offers immédiatement avec min_score=0.5 et limit=5 pour trouver les offres les mieux notées.
+Le score de pertinence a déjà été calculé à l'avance par rapport au profil de l'utilisateur (CV),
+donc trier par score DESC répond automatiquement à "qu'est-ce qui me correspond le mieux".
+
+NE POSE JAMAIS de question de clarification avant d'avoir appelé au moins un outil. Tu peux
+affiner ta recherche après avoir vu les premiers résultats, mais jamais avant.
 
 Ne réponds jamais avec des informations inventées. Base-toi uniquement sur le résultat des outils.
 
