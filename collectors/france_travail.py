@@ -20,10 +20,15 @@ def get_token():
         "client_secret": FRANCE_TRAVAIL_CLIENT_SECRET,
         "scope": "api_offresdemploiv2 o2dsoffre",
     }, timeout=15)
+
+    if resp.status_code != 200:
+        print(f"⚠️ Erreur token — status {resp.status_code}")
+        print(f"Réponse : {resp.text}")
+        print(f"Client ID utilisé (masqué) : {FRANCE_TRAVAIL_CLIENT_ID[:10]}...{FRANCE_TRAVAIL_CLIENT_ID[-4:] if FRANCE_TRAVAIL_CLIENT_ID else 'VIDE'}")
+
     resp.raise_for_status()
     _cached_token = resp.json()["access_token"]
     return _cached_token
-
 def fetch_offers(keyword: str) -> list[JobOffer]:
     token = get_token()
     headers = {"Authorization": f"Bearer {token}"}
