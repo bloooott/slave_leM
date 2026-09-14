@@ -1,1 +1,37 @@
+name: Scraping automatique des offres
 
+on:
+  schedule:
+    - cron: "0 7,12,17,21 * * *"   # 4x/jour (heure UTC, donc 9h/14h/19h/23h en France l'été)
+  workflow_dispatch:                # bouton "Run workflow" manuel sur GitHub
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Lancer le scraping + scoring
+        env:
+          FT_CLIENT_ID: ${{ secrets.FT_CLIENT_ID }}
+          FT_CLIENT_SECRET: ${{ secrets.FT_CLIENT_SECRET }}
+        run: python refresh.py
+
+      - name: Commit la base mise à jour
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add jobs.db
+          git diff --staged --quiet || git commit -m "Mise à jour automatique des offres"
+          git push
