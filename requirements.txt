@@ -1,0 +1,7 @@
+requests
+python-dotenv
+playwright
+sentence-transformers
+numpy
+ollama
+streamlit
