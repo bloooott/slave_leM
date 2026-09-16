@@ -26,10 +26,10 @@ def _normalize(text: str) -> str:
     return text
 
 
-def _has_senior_flag(titre: str) -> bool:
-    titre_norm = _normalize(titre)
-    titre_norm = f" {titre_norm.strip()} "
-    return any(f" {flag}" in titre_norm or titre_norm.startswith(f" {flag}") or flag in titre_norm for flag in SENIOR_FLAGS)
+def _has_senior_flag(text: str) -> bool:
+    text_norm = _normalize(text)
+    text_norm = f" {text_norm.strip()} "
+    return any(f" {flag}" in text_norm or text_norm.startswith(f" {flag}") or flag in text_norm for flag in SENIOR_FLAGS)
 
 
 def is_junior_friendly(titre: str, description: str) -> bool:
@@ -96,6 +96,10 @@ def passes_hard_filters(raw_offer: dict) -> bool:
     description = raw_offer.get("description", "")
 
     if _has_senior_flag(titre):
+        return False
+
+    # Vérifie aussi les mots senior dans la description (pas juste le titre)
+    if _has_senior_flag(description):
         return False
 
     if not is_junior_friendly(titre, description):
