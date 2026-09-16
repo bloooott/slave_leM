@@ -5,3 +5,5 @@ sentence-transformers
 numpy
 ollama
 streamlit
+beautifulsoup4
+pandas

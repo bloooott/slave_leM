@@ -23,11 +23,31 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
-      - name: Installer les dépendances
-        run: |
-          pip install -r requirements.txt
-          playwright install --with-deps chromium
+      - name: Installer les dépendances Python
+        run: pip install -r requirements.txt
+
+      - name: Cache modèle sentence-transformers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-model-${{ runner.os }}-minilm
+
+      - name: Cache navigateur Playwright
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Installer Playwright (navigateur + dépendances système)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: playwright install --with-deps chromium
+
+      - name: Installer dépendances système Playwright (si cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: playwright install-deps chromium
 
       - name: Lancer le scraping + scoring
         env:
