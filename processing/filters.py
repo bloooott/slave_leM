@@ -1,46 +1,63 @@
 import re
+import unicodedata
 from config import PROFILE
 
 SENIOR_FLAGS = [
-    "confirmé", "confirmée", "expérimenté", "expérimentée",
+    "confirme", "confirmee", "experimente", "experimentee",
     "senior", "expert", "freelance",
     "tech lead", "staff engineer", "staff ", "engineering manager",
-    "manager", "principal ",
+    "manager", "principal ", "lead ",
 ]
 
 JUNIOR_FRIENDLY_FLAGS = [
-    "débutant accepté", "débutant accepte", "débutant bienvenu", "profil junior",
-    "junior accepté", "sans expérience", "premier emploi", "jeune diplômé",
-    "jeune diplômée", "0-2 ans", "0 à 2 ans",
+    "debutant accepte", "debutant bienvenu", "profil junior",
+    "junior accepte", "sans experience", "premier emploi", "jeune diplome",
+    "0-2 ans", "0 a 2 ans",
 ]
 
-# Seuil d'expérience maximum accepté (en années). Une offre demandant plus est filtrée.
 MAX_EXPERIENCE_YEARS = 1
 
 
+def _normalize(text: str) -> str:
+    """Retire les accents pour une comparaison robuste (senior/sénior, experience/expérience, etc.)."""
+    text = text.lower()
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return text
+
+
 def _has_senior_flag(titre: str) -> bool:
-    titre = f" {titre.strip()} "
-    return any(f" {flag}" in titre or titre.startswith(f" {flag}") or flag in titre for flag in SENIOR_FLAGS)
+    titre_norm = _normalize(titre)
+    titre_norm = f" {titre_norm.strip()} "
+    return any(f" {flag}" in titre_norm or titre_norm.startswith(f" {flag}") or flag in titre_norm for flag in SENIOR_FLAGS)
 
 
 def is_junior_friendly(titre: str, description: str) -> bool:
-    combined = f"{titre} {description}".lower()
+    combined = _normalize(f"{titre} {description}")
     return any(flag in combined for flag in JUNIOR_FRIENDLY_FLAGS)
 
 
 def _extract_min_experience_years(text: str) -> int | None:
     """
-    Cherche des mentions d'expérience du type :
-    - "5 à 10 ans d'expérience"
-    - "3-5 ans d'expérience"
+    Cherche des mentions d'expérience dans plusieurs formats courants (texte normalisé, sans accents) :
+    - "5 a 10 ans d'experience"
     - "minimum 3 ans"
-    - "3 ans minimum"
-    - "5 ans d'expérience"
+    - "5 ans d'experience"
+    - "Exp. 5 ans min." (badge HelloWork)
+    - "Exp. 1 - 3 ans" (badge HelloWork avec fourchette)
     Retourne le nombre d'années minimum demandé, ou None si rien trouvé.
     """
-    text = text.lower()
+    text = _normalize(text)
 
-    match = re.search(r"(\d+)\s*(?:à|-|\bet\b)\s*(\d+)\s*ans", text)
+    match = re.search(r"exp\.?\s*(\d+)\s*ans?\s*min", text)
+    if match:
+        return int(match.group(1))
+
+    match = re.search(r"exp\.?\s*(\d+)\s*-\s*(\d+)\s*ans", text)
+    if match:
+        return int(match.group(1))
+
+    match = re.search(r"(\d+)\s*(?:a|-|\bet\b)\s*(\d+)\s*ans", text)
     if match:
         return int(match.group(1))
 
@@ -51,12 +68,12 @@ def _extract_min_experience_years(text: str) -> int | None:
     if match:
         return int(match.group(1))
 
-    match = re.search(r"(\d+)\+?\s*ans?\s*d[’']?exp", text)
+    match = re.search(r"(\d+)\+?\s*ans?\s*d['’]?exp", text)
     if match:
         return int(match.group(1))
 
     match = re.search(r"(\d+)\s*ans", text)
-    if match and "expérience" in text:
+    if match and "experience" in text:
         return int(match.group(1))
 
     return None
@@ -75,25 +92,28 @@ def passes_hard_filters(raw_offer: dict) -> bool:
     if type_contrat not in PROFILE["contract_types"]:
         return False
 
-    titre = raw_offer.get("intitule", "").lower()
-    description = raw_offer.get("description", "").lower()
+    titre = raw_offer.get("intitule", "")
+    description = raw_offer.get("description", "")
 
     if _has_senior_flag(titre):
         return False
 
-    # Si l'offre se déclare explicitement ouverte aux débutants, on ignore le filtre d'années
     if not is_junior_friendly(titre, description):
         if has_excessive_experience_requirement(titre, description):
             return False
 
+    titre_norm = _normalize(titre)
+    description_norm = _normalize(description)
     for excluded in PROFILE["excluded_keywords"]:
-        if excluded.lower() in titre or excluded.lower() in description:
+        excluded_norm = _normalize(excluded)
+        if excluded_norm in titre_norm or excluded_norm in description_norm:
             return False
 
-    secteur = raw_offer.get("secteurActiviteLibelle", "").lower()
-    entreprise = raw_offer.get("entreprise", {}).get("nom", "").lower()
+    secteur = _normalize(raw_offer.get("secteurActiviteLibelle", ""))
+    entreprise = _normalize(raw_offer.get("entreprise", {}).get("nom", ""))
     for excluded in PROFILE["excluded_sectors"]:
-        if excluded in secteur or excluded in entreprise or excluded in titre:
+        excluded_norm = _normalize(excluded)
+        if excluded_norm in secteur or excluded_norm in entreprise or excluded_norm in titre_norm:
             return False
 
     return True
