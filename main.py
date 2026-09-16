@@ -16,7 +16,7 @@ def run():
     for title in PROFILE["job_titles"]:
         offers = fetch_france_travail(title)
         new_count = save_offers(offers)
-        total_new += new_count
+        total_new += new_count  
         print(f"{title}: {len(offers)} récupérées, {new_count} nouvelles")
 
     print("\n=== HelloWork ===")

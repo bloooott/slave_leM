@@ -9,9 +9,11 @@ MAX_CANDIDATES_TO_CHECK = 8
 
 
 def _get_full_description(page, url: str) -> str:
+    """Va sur la page de détail et extrait la section 'Profil recherché',
+    qui est dans un <details>/<summary> HTML natif (accordéon)."""
     try:
-        page.goto(url, timeout=20000)
-        page.wait_for_timeout(1500)
+        page.goto(url, timeout=10000)
+        page.wait_for_timeout(1000)
 
         try:
             cookie_button = page.query_selector("text=Continuer sans accepter")
@@ -129,7 +131,6 @@ def fetch_offers(keyword: str, max_hours: int = 48) -> list[JobOffer]:
 
         print(f"  → {len(candidates)} candidat(e)s après filtrage rapide")
 
-        # Limite pour garder un temps de scraping raisonnable
         if len(candidates) > MAX_CANDIDATES_TO_CHECK:
             print(f"  → limite à {MAX_CANDIDATES_TO_CHECK} candidat(e)s vérifié(e)s (les plus récent(e)s)")
         candidates = candidates[:MAX_CANDIDATES_TO_CHECK]

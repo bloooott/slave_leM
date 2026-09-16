@@ -22,7 +22,7 @@ PROFILE = {
     "location": "France",
     "remote": True,
     "seniority": "junior",
-    "excluded_keywords": ["stage", "stagiaire", "apprenti", "apprentie", "apprentissage", "alternance", "alternant"],
+    "excluded_keywords": ["stage", "stagiaire", "apprenti", "apprentie", "apprentissage", "alternance", "alternant", "thèse", "doctorat", "doctorant", "doctorante"],
     "contract_types": ["CDI", "CDD"],
     "require_no_experience": True,
     "excluded_sectors": ["banque", "assurance", "bancaire", "assurances", "services financiers"],
