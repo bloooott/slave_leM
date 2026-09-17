@@ -6,8 +6,8 @@ from config import PROFILE
 def run():
     init_db()
 
-    print("=== Nettoyage des offres obsolètes (> 48h) ===")
-    deleted = delete_old_offers(max_hours=48)
+    print("=== Nettoyage des offres obsolètes (> 12h) ===")
+    deleted = delete_old_offers(max_hours=12)
     print(f"{deleted} offre(s) supprimée(s)\n")
 
     total_new = 0
@@ -20,7 +20,6 @@ def run():
         print(f"{title}: {len(offers)} récupérées, {new_count} nouvelles")
 
     print("\n=== HelloWork ===")
-    # Un seul navigateur partagé pour tous les mots-clés (au lieu d'un par mot-clé)
     all_results = fetch_offers_batch(PROFILE["job_titles"])
     for title, offers in all_results.items():
         new_count = save_offers(offers)
