@@ -12,12 +12,12 @@ SENIOR_FLAGS = [
 JUNIOR_FRIENDLY_FLAGS = [
     "debutant accepte", "debutant bienvenu", "profil junior",
     "junior accepte", "sans experience", "premier emploi", "jeune diplome",
-    "0-2 ans", "0 a 2 ans", "entry level", "no experience required",
+    "0-2 ans", "0 a 2 ans", "entry level", "entry-level",
+    "no experience required", "graduate", "junior", "debutant",
 ]
 
-MAX_EXPERIENCE_YEARS = 1
+MAX_EXPERIENCE_YEARS = 2
 
-# Nombres français écrits en toutes lettres -> chiffre
 FRENCH_NUMBER_WORDS = {
     "un": 1, "une": 1, "deux": 2, "trois": 3, "quatre": 4, "cinq": 5,
     "six": 6, "sept": 7, "huit": 8, "neuf": 9, "dix": 10,
@@ -26,16 +26,12 @@ FRENCH_NUMBER_WORDS = {
 
 
 def _normalize(text: str) -> str:
-    """Retire les accents pour une comparaison robuste (senior/sénior, experience/expérience, etc.)."""
     text = text.lower()
     text = unicodedata.normalize("NFKD", text)
-    text = "".join(c for c in text if not unicodedata.combining(c))
-    return text
+    return "".join(c for c in text if not unicodedata.combining(c))
 
 
 def _replace_spelled_out_numbers(text: str) -> str:
-    """Remplace les nombres français écrits en toutes lettres par leur chiffre
-    (ex: 'quatre ans' -> '4 ans'), pour que la regex numérique les détecte."""
     for word, digit in FRENCH_NUMBER_WORDS.items():
         text = re.sub(rf"\b{word}\b", str(digit), text)
     return text
@@ -52,19 +48,17 @@ def is_junior_friendly(titre: str, description: str) -> bool:
     return any(flag in combined for flag in JUNIOR_FRIENDLY_FLAGS)
 
 
+def is_junior_in_title(titre: str) -> bool:
+    """Vérifie spécifiquement si 'junior' ou 'débutant' apparaît dans le TITRE
+    (signal plus fort qu'une mention noyée dans la description)."""
+    titre_norm = _normalize(titre)
+    return "junior" in titre_norm or "debutant" in titre_norm
+
+
 def _extract_min_experience_years(text: str) -> int | None:
-    """
-    Cherche des mentions d'expérience en français ET en anglais, chiffres ou toutes lettres :
-    - "5 a 10 ans d'experience" / "5 to 10 years of experience"
-    - "minimum 3 ans" / "quatre ans d'experience"
-    - "Exp. 5 ans min." (badge HelloWork)
-    - "5+ years of experience"
-    Retourne le nombre d'années minimum demandé, ou None si rien trouvé.
-    """
     text = _normalize(text)
     text = _replace_spelled_out_numbers(text)
 
-    # Anglais : "5+ years of experience" / "5 years experience" / "3-5 years"
     match = re.search(r"(\d+)\+?\s*(?:-|to)?\s*(\d+)?\s*years?\s*(?:of\s*)?exp", text)
     if match:
         return int(match.group(1))
@@ -72,35 +66,24 @@ def _extract_min_experience_years(text: str) -> int | None:
     if match and "experience" in text:
         return int(match.group(1))
 
-    # Badge HelloWork : "Exp. 5 ans min."
     match = re.search(r"exp\.?\s*(\d+)\s*ans?\s*min", text)
     if match:
         return int(match.group(1))
-
-    # Badge HelloWork avec fourchette : "Exp. 1 - 3 ans"
     match = re.search(r"exp\.?\s*(\d+)\s*-\s*(\d+)\s*ans", text)
     if match:
         return int(match.group(1))
-
-    # "X a Y ans" ou "X-Y ans"
     match = re.search(r"(\d+)\s*(?:a|-|\bet\b)\s*(\d+)\s*ans", text)
     if match:
         return int(match.group(1))
-
-    # "minimum X ans" ou "X ans minimum"
     match = re.search(r"minimum\s*(?:de\s*)?(\d+)\s*ans", text)
     if match:
         return int(match.group(1))
     match = re.search(r"(\d+)\s*ans\s*minimum", text)
     if match:
         return int(match.group(1))
-
-    # "X ans d'experience"
     match = re.search(r"(\d+)\+?\s*ans?\s*d['’]?exp", text)
     if match:
         return int(match.group(1))
-
-    # "X ans" générique associé au mot experience
     match = re.search(r"(\d+)\s*ans", text)
     if match and "experience" in text:
         return int(match.group(1))

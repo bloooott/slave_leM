@@ -1,6 +1,6 @@
 from matching.embeddings import embed_text, cosine_similarity
 from storage.db import get_unscored_offers, get_connection
-from processing.filters import is_junior_friendly
+from processing.filters import is_junior_friendly, is_junior_in_title
 from config import CV_TEXT
 
 def score_all_offers():
@@ -15,8 +15,12 @@ def score_all_offers():
             offer_vector = embed_text(offer_text)
             score = cosine_similarity(cv_vector, offer_vector)
 
-            if is_junior_friendly(offer['title'], offer['description']):
-                score = min(score + 0.05, 1.0)
+            # Bonus fort si "junior"/"débutant" apparaît dans le TITRE (signal explicite)
+            if is_junior_in_title(offer['title']):
+                score = min(score + 0.20, 1.0)
+            # Bonus plus léger si mentionné seulement dans la description
+            elif is_junior_friendly(offer['title'], offer['description']):
+                score = min(score + 0.10, 1.0)
 
             conn.execute(
                 "UPDATE offers SET score = ? WHERE id = ?",
