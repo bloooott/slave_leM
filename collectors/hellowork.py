@@ -15,31 +15,22 @@ HEADERS = {
 
 
 def _get_full_description_fast(url: str) -> str:
-    """Tente de récupérer la description via une simple requête HTTP (rapide, pas de navigateur)."""
+    """Tente de récupérer TOUT le texte de la page via une simple requête HTTP (rapide, pas de navigateur)."""
     try:
         resp = requests.get(url, headers=HEADERS, timeout=8)
         if resp.status_code != 200:
             return ""
-
         soup = BeautifulSoup(resp.text, "html.parser")
-        summaries = soup.find_all("summary")
-        for s in summaries:
-            if "profil recherché" in s.get_text(strip=True).lower():
-                details = s.find_parent("details")
-                if details:
-                    return details.get_text(separator=" ", strip=True)
-
         return soup.get_text(separator=" ", strip=True)
-
     except Exception:
         return ""
 
 
 def _get_full_description(page, url: str) -> str:
-    """Extrait la description : essaie d'abord via requests (rapide),
-    retombe sur Playwright si le résultat est vide ou trop court."""
+    """Récupère TOUT le texte de la page de détail (pas juste une section précise,
+    car les infos d'expérience peuvent être dans 'Profil recherché', 'Missions', ou un badge)."""
     fast_result = _get_full_description_fast(url)
-    if fast_result and len(fast_result) > 100:
+    if fast_result and len(fast_result) > 300:  # seuil plus élevé pour s'assurer d'avoir le vrai contenu
         return fast_result
 
     try:
@@ -59,20 +50,6 @@ def _get_full_description(page, url: str) -> str:
         except Exception:
             pass
 
-        result = page.evaluate("""
-            () => {
-                const summaries = Array.from(document.querySelectorAll('summary'));
-                const target = summaries.find(s => (s.textContent || '').toLowerCase().includes('profil recherché'));
-                if (!target) return null;
-                const details = target.closest('details');
-                if (!details) return null;
-                return (details.textContent || '').trim();
-            }
-        """)
-
-        if result and len(result) > 30:
-            return result
-
         return page.inner_text("body")
 
     except Exception as e:
@@ -81,7 +58,6 @@ def _get_full_description(page, url: str) -> str:
 
 
 def fetch_offers_for_keyword(page, keyword: str, max_hours: int = 48) -> list[JobOffer]:
-    """Scrape les offres pour UN mot-clé, en réutilisant une page/navigateur déjà ouvert."""
     offers = []
 
     url = f"{SEARCH_URL}?k={quote(keyword)}&st=date&d=h"
@@ -185,8 +161,6 @@ def fetch_offers_for_keyword(page, keyword: str, max_hours: int = 48) -> list[Jo
 
 
 def fetch_offers(keyword: str, max_hours: int = 48) -> list[JobOffer]:
-    """Version standalone : lance son propre navigateur (utilisée pour un test isolé,
-    ou si appelée hors du contexte batch de main.py)."""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(user_agent=HEADERS["User-Agent"])
@@ -197,7 +171,6 @@ def fetch_offers(keyword: str, max_hours: int = 48) -> list[JobOffer]:
 
 
 def fetch_offers_batch(keywords: list[str], max_hours: int = 48) -> dict[str, list[JobOffer]]:
-    """Scrape TOUS les mots-clés avec un seul navigateur partagé (beaucoup plus rapide)."""
     results = {}
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
