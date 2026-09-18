@@ -1,4 +1,3 @@
-
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
@@ -15,21 +14,42 @@ HEADERS = {
 }
 
 
+def _clean_page_text(full_text: str) -> str:
+    """Coupe le texte de la page avant les sections de suggestions/navigation,
+    qui peuvent contenir des mots-clés trompeurs (ex: 'Senior' dans une offre
+    suggérée sans rapport avec l'offre actuelle)."""
+    end_markers = [
+        "ces offres pourraient aussi",
+        "recherches similaires",
+        "créez votre compte hellowork",
+    ]
+
+    lower_text = full_text.lower()
+    cut_idx = len(full_text)
+    for marker in end_markers:
+        idx = lower_text.find(marker)
+        if idx != -1 and idx < cut_idx:
+            cut_idx = idx
+
+    return full_text[:cut_idx].strip()
+
+
 def _get_full_description_fast(url: str) -> str:
-    """Tente de récupérer TOUT le texte de la page via une simple requête HTTP (rapide, pas de navigateur)."""
+    """Tente de récupérer le texte de la page via une simple requête HTTP (rapide, pas de navigateur)."""
     try:
         resp = requests.get(url, headers=HEADERS, timeout=8)
         if resp.status_code != 200:
             return ""
         soup = BeautifulSoup(resp.text, "html.parser")
-        return soup.get_text(separator=" ", strip=True)
+        raw_text = soup.get_text(separator=" ", strip=True)
+        return _clean_page_text(raw_text)
     except Exception:
         return ""
 
 
 def _get_full_description(page, url: str) -> str:
-    """Récupère TOUT le texte de la page de détail (pas juste une section précise,
-    car les infos d'expérience peuvent être dans 'Profil recherché', 'Missions', ou un badge)."""
+    """Récupère le texte de la page de détail (nettoyé des sections de suggestions),
+    car les infos d'expérience peuvent être dans 'Profil recherché', 'Missions', ou un badge."""
     fast_result = _get_full_description_fast(url)
     if fast_result and len(fast_result) > 300:
         return fast_result
@@ -51,7 +71,8 @@ def _get_full_description(page, url: str) -> str:
         except Exception:
             pass
 
-        return page.inner_text("body")
+        raw_text = page.inner_text("body")
+        return _clean_page_text(raw_text)
 
     except Exception as e:
         print(f"    ⚠️ Impossible de charger la description complète : {e}")
