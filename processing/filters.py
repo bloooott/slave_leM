@@ -6,7 +6,7 @@ SENIOR_FLAGS = [
     "confirme", "confirmee", "experimente", "experimentee",
     "senior", "expert", "freelance",
     "tech lead", "staff engineer", "staff ", "engineering manager",
-    "manager", "principal ", "lead ",
+    "manager", "lead ",
 ]
 
 JUNIOR_FRIENDLY_FLAGS = [
@@ -49,8 +49,6 @@ def is_junior_friendly(titre: str, description: str) -> bool:
 
 
 def is_junior_in_title(titre: str) -> bool:
-    """Vérifie spécifiquement si 'junior' ou 'débutant' apparaît dans le TITRE
-    (signal plus fort qu'une mention noyée dans la description)."""
     titre_norm = _normalize(titre)
     return "junior" in titre_norm or "debutant" in titre_norm
 
