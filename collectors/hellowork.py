@@ -1,9 +1,10 @@
+
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
 from playwright.sync_api import sync_playwright
 from collectors.base import JobOffer
-from processing.filters import passes_hard_filters, has_excessive_experience_requirement, is_junior_friendly
+from processing.filters import passes_hard_filters
 from processing.recency import is_recent_indeed_text
 
 SEARCH_URL = "https://www.hellowork.com/fr-fr/emploi/recherche.html"
@@ -30,7 +31,7 @@ def _get_full_description(page, url: str) -> str:
     """Récupère TOUT le texte de la page de détail (pas juste une section précise,
     car les infos d'expérience peuvent être dans 'Profil recherché', 'Missions', ou un badge)."""
     fast_result = _get_full_description_fast(url)
-    if fast_result and len(fast_result) > 300:  # seuil plus élevé pour s'assurer d'avoir le vrai contenu
+    if fast_result and len(fast_result) > 300:
         return fast_result
 
     try:
@@ -127,6 +128,7 @@ def fetch_offers_for_keyword(page, keyword: str, max_hours: int = 48) -> list[Jo
             "location": location,
             "url": url_job,
             "posted_date": posted_text,
+            "contract": contract,
         })
 
     print(f"  → {len(candidates)} candidat(e)s après filtrage rapide")
@@ -138,10 +140,17 @@ def fetch_offers_for_keyword(page, keyword: str, max_hours: int = 48) -> list[Jo
     for c in candidates:
         full_text = _get_full_description(page, c["url"])
 
-        if not is_junior_friendly(c["title"], full_text):
-            if has_excessive_experience_requirement(c["title"], full_text):
-                print(f"  ✗ Filtrée (expérience excessive) : {c['title']} — {c['company']}")
-                continue
+        raw_full = {
+            "typeContrat": c["contract"],
+            "intitule": c["title"],
+            "description": full_text,
+            "secteurActiviteLibelle": "",
+            "entreprise": {"nom": c["company"]},
+        }
+
+        if not passes_hard_filters(raw_full):
+            print(f"  ✗ Filtrée (critères complets) : {c['title']} — {c['company']}")
+            continue
 
         print(f"  ✓ Retenue : {c['title']} — {c['company']}")
 
