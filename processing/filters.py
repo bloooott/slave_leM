@@ -5,8 +5,8 @@ from config import PROFILE
 SENIOR_FLAGS = [
     "confirme", "confirmee", "experimente", "experimentee",
     "senior", "expert", "freelance",
-    "tech lead", "staff engineer", "staff ", "engineering manager",
-    "manager", "lead ",
+    "tech lead", "staff engineer", "staff", "engineering manager",
+    "manager", "lead",
 ]
 
 JUNIOR_FRIENDLY_FLAGS = [
@@ -38,9 +38,14 @@ def _replace_spelled_out_numbers(text: str) -> str:
 
 
 def _has_senior_flag(text: str) -> bool:
+    """Détecte un mot senior avec de vraies limites de mots (\\b),
+    pour que 'expert' ne matche pas 'expertise', ni 'lead' 'leadership'."""
     text_norm = _normalize(text)
-    text_norm = f" {text_norm.strip()} "
-    return any(f" {flag}" in text_norm or text_norm.startswith(f" {flag}") or flag in text_norm for flag in SENIOR_FLAGS)
+    for flag in SENIOR_FLAGS:
+        pattern = r"\b" + re.escape(flag.strip()) + r"\b"
+        if re.search(pattern, text_norm):
+            return True
+    return False
 
 
 def is_junior_friendly(titre: str, description: str) -> bool:
@@ -97,22 +102,31 @@ def has_excessive_experience_requirement(titre: str, description: str, max_years
     return min_years > max_years
 
 
-def passes_hard_filters(raw_offer: dict) -> bool:
+def passes_hard_filters(raw_offer: dict, debug: bool = False) -> bool:
     type_contrat = raw_offer.get("typeContrat", "")
     if type_contrat not in PROFILE["contract_types"]:
+        if debug:
+            print(f"    [debug] Rejet : type de contrat '{type_contrat}' non accepté")
         return False
 
     titre = raw_offer.get("intitule", "")
     description = raw_offer.get("description", "")
 
     if _has_senior_flag(titre):
+        if debug:
+            print(f"    [debug] Rejet : mot senior dans le TITRE")
         return False
 
     if _has_senior_flag(description):
+        if debug:
+            print(f"    [debug] Rejet : mot senior dans la DESCRIPTION")
         return False
 
     if not is_junior_friendly(titre, description):
         if has_excessive_experience_requirement(titre, description):
+            if debug:
+                years = _extract_min_experience_years(f"{titre} {description}")
+                print(f"    [debug] Rejet : expérience excessive ({years} ans, max {MAX_EXPERIENCE_YEARS})")
             return False
 
     titre_norm = _normalize(titre)
@@ -120,6 +134,8 @@ def passes_hard_filters(raw_offer: dict) -> bool:
     for excluded in PROFILE["excluded_keywords"]:
         excluded_norm = _normalize(excluded)
         if excluded_norm in titre_norm or excluded_norm in description_norm:
+            if debug:
+                print(f"    [debug] Rejet : mot-clé exclu : '{excluded}'")
             return False
 
     secteur = _normalize(raw_offer.get("secteurActiviteLibelle", ""))
@@ -127,6 +143,8 @@ def passes_hard_filters(raw_offer: dict) -> bool:
     for excluded in PROFILE["excluded_sectors"]:
         excluded_norm = _normalize(excluded)
         if excluded_norm in secteur or excluded_norm in entreprise or excluded_norm in titre_norm:
+            if debug:
+                print(f"    [debug] Rejet : secteur exclu : '{excluded}'")
             return False
 
     return True

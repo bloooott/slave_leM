@@ -16,9 +16,8 @@ HEADERS = {
 
 def _clean_page_text(full_text: str) -> str:
     """Coupe le texte de la page avant les sections de suggestions/navigation,
-    qui peuvent contenir des mots-clés trompeurs (ex: 'Senior' dans une offre
-    suggérée sans rapport avec l'offre actuelle), et retire le texte de
-    navigation/accessibilité générique (ex: 'Aller au contenu principal')."""
+    qui peuvent contenir des mots-clés trompeurs, et retire le texte de
+    navigation/accessibilité générique."""
     end_markers = [
         "ces offres pourraient aussi",
         "recherches similaires",
@@ -53,8 +52,7 @@ def _get_full_description_fast(url: str) -> str:
 
 def _get_full_description(page, url: str) -> str:
     """Récupère le texte de la page de détail (nettoyé des sections de suggestions
-    et du texte de navigation), car les infos d'expérience peuvent être dans
-    'Profil recherché', 'Missions', ou un badge."""
+    et du texte de navigation)."""
     fast_result = _get_full_description_fast(url)
     if fast_result and len(fast_result) > 300:
         return fast_result
@@ -174,7 +172,8 @@ def fetch_offers_for_keyword(page, keyword: str, max_hours: int = 48) -> list[Jo
             "entreprise": {"nom": c["company"]},
         }
 
-        if not passes_hard_filters(raw_full):
+        # DEBUG activé temporairement pour identifier la cause du rejet systématique
+        if not passes_hard_filters(raw_full, debug=True):
             print(f"  ✗ Filtrée (critères complets) : {c['title']} — {c['company']}")
             continue
 
