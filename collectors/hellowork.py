@@ -15,9 +15,8 @@ HEADERS = {
 
 
 def _clean_page_text(full_text: str) -> str:
-    """Coupe le texte de la page avant les sections de suggestions/navigation,
-    qui peuvent contenir des mots-clés trompeurs, et retire le texte de
-    navigation/accessibilité générique."""
+    """Coupe le texte de la page avant les sections de suggestions/navigation
+    (utilisé uniquement en dernier recours, si l'extraction ciblée échoue)."""
     end_markers = [
         "ces offres pourraient aussi",
         "recherches similaires",
@@ -37,13 +36,35 @@ def _clean_page_text(full_text: str) -> str:
     return cleaned.strip()
 
 
+def _extract_job_content_fast(soup: BeautifulSoup) -> str:
+    """Extrait uniquement les blocs 'Missions' et 'Profil recherché' (accordéons <details>),
+    en ignorant tout le reste de la page (suggestions, footer, navigation).
+    Beaucoup plus fiable qu'un découpage par mot-clé de fin, qui peut échouer
+    silencieusement si le texte est concaténé sans espaces."""
+    parts = []
+    for details in soup.find_all("details"):
+        summary = details.find("summary")
+        if not summary:
+            continue
+        summary_text = summary.get_text(strip=True).lower()
+        if "profil recherche" in summary_text or "missions du poste" in summary_text or "profil recherché" in summary_text:
+            parts.append(details.get_text(separator=" ", strip=True))
+
+    return " ".join(parts).strip()
+
+
 def _get_full_description_fast(url: str) -> str:
-    """Tente de récupérer le texte de la page via une simple requête HTTP (rapide, pas de navigateur)."""
+    """Tente de récupérer la description via une simple requête HTTP (rapide, pas de navigateur)."""
     try:
         resp = requests.get(url, headers=HEADERS, timeout=8)
         if resp.status_code != 200:
             return ""
         soup = BeautifulSoup(resp.text, "html.parser")
+
+        targeted = _extract_job_content_fast(soup)
+        if targeted and len(targeted) > 100:
+            return targeted
+
         raw_text = soup.get_text(separator=" ", strip=True)
         return _clean_page_text(raw_text)
     except Exception:
@@ -51,10 +72,10 @@ def _get_full_description_fast(url: str) -> str:
 
 
 def _get_full_description(page, url: str) -> str:
-    """Récupère le texte de la page de détail (nettoyé des sections de suggestions
-    et du texte de navigation)."""
+    """Récupère la description : essaie d'abord via requests (rapide),
+    retombe sur Playwright si nécessaire."""
     fast_result = _get_full_description_fast(url)
-    if fast_result and len(fast_result) > 300:
+    if fast_result and len(fast_result) > 100:
         return fast_result
 
     try:
@@ -73,6 +94,25 @@ def _get_full_description(page, url: str) -> str:
                     page.wait_for_timeout(500)
         except Exception:
             pass
+
+        targeted = page.evaluate("""
+            () => {
+                const detailsList = Array.from(document.querySelectorAll('details'));
+                let parts = [];
+                for (const d of detailsList) {
+                    const summary = d.querySelector('summary');
+                    if (!summary) continue;
+                    const t = (summary.textContent || '').toLowerCase();
+                    if (t.includes('profil recherche') || t.includes('missions du poste')) {
+                        parts.push(d.textContent || '');
+                    }
+                }
+                return parts.join(' ').trim();
+            }
+        """)
+
+        if targeted and len(targeted) > 100:
+            return targeted
 
         raw_text = page.inner_text("body")
         return _clean_page_text(raw_text)
@@ -172,7 +212,6 @@ def fetch_offers_for_keyword(page, keyword: str, max_hours: int = 48) -> list[Jo
             "entreprise": {"nom": c["company"]},
         }
 
-        # DEBUG activé temporairement pour identifier la cause du rejet systématique
         if not passes_hard_filters(raw_full, debug=True):
             print(f"  ✗ Filtrée (critères complets) : {c['title']} — {c['company']}")
             continue
