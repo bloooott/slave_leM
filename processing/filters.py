@@ -9,6 +9,16 @@ SENIOR_FLAGS = [
     "manager", "lead",
 ]
 
+NEGATION_PATTERNS = [
+    r"pas\s+besoin\s+d[’']?etre",
+    r"pas\s+forcement",
+    r"sans\s+etre",
+    r"n[’']?avez\s+pas\s+besoin",
+    r"nul\s+besoin\s+d[’']?etre",
+    r"pas\s+necessairement",
+    r"pas\s+deja",
+]
+
 JUNIOR_FRIENDLY_FLAGS = [
     "debutant accepte", "debutant bienvenu", "profil junior",
     "junior accepte", "sans experience", "premier emploi", "jeune diplome",
@@ -38,13 +48,18 @@ def _replace_spelled_out_numbers(text: str) -> str:
 
 
 def _has_senior_flag(text: str) -> bool:
-    """Détecte un mot senior avec de vraies limites de mots (\\b),
-    pour que 'expert' ne matche pas 'expertise', ni 'lead' 'leadership'."""
+    """Détecte un mot senior avec de vraies limites de mots, en ignorant les cas
+    où le mot est précédé d'une négation (ex: 'pas besoin d'être expert')."""
     text_norm = _normalize(text)
+
     for flag in SENIOR_FLAGS:
         pattern = r"\b" + re.escape(flag.strip()) + r"\b"
-        if re.search(pattern, text_norm):
-            return True
+        for match in re.finditer(pattern, text_norm):
+            context_before = text_norm[max(0, match.start() - 60):match.start()]
+            is_negated = any(re.search(neg, context_before) for neg in NEGATION_PATTERNS)
+            if not is_negated:
+                return True
+
     return False
 
 
