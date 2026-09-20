@@ -1,3 +1,4 @@
+import re
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
@@ -37,11 +38,18 @@ def _clean_page_text(full_text: str) -> str:
 
 
 def _extract_job_content_fast(soup: BeautifulSoup) -> str:
-    """Extrait uniquement les blocs 'Missions' et 'Profil recherché' (accordéons <details>),
-    en ignorant tout le reste de la page (suggestions, footer, navigation).
-    Beaucoup plus fiable qu'un découpage par mot-clé de fin, qui peut échouer
-    silencieusement si le texte est concaténé sans espaces."""
+    """Extrait le contenu des accordéons 'Missions'/'Profil recherché',
+    ET le badge d'expérience (souvent hors accordéon, dans les métadonnées du poste,
+    ex: 'Exp. 7 ans min.' à côté de 'Bac +5', 'Secteur informatique'...)."""
     parts = []
+
+    # Badge d'expérience, situé dans les métadonnées en haut de page (hors accordéon)
+    for li in soup.find_all("li"):
+        li_text = li.get_text(strip=True)
+        if re.match(r"^exp\.?\s*\d", li_text, re.IGNORECASE):
+            parts.append(li_text)
+
+    # Contenu des accordéons Missions/Profil recherché
     for details in soup.find_all("details"):
         summary = details.find("summary")
         if not summary:
@@ -97,16 +105,26 @@ def _get_full_description(page, url: str) -> str:
 
         targeted = page.evaluate("""
             () => {
-                const detailsList = Array.from(document.querySelectorAll('details'));
                 let parts = [];
+
+                const lis = Array.from(document.querySelectorAll('li'));
+                for (const li of lis) {
+                    const t = (li.textContent || '').trim();
+                    if (/^exp\\.?\\s*\\d/i.test(t)) {
+                        parts.push(t);
+                    }
+                }
+
+                const detailsList = Array.from(document.querySelectorAll('details'));
                 for (const d of detailsList) {
                     const summary = d.querySelector('summary');
                     if (!summary) continue;
-                    const t = (summary.textContent || '').toLowerCase();
-                    if (t.includes('profil recherche') || t.includes('missions du poste')) {
+                    const st = (summary.textContent || '').toLowerCase();
+                    if (st.includes('profil recherche') || st.includes('missions du poste')) {
                         parts.push(d.textContent || '');
                     }
                 }
+
                 return parts.join(' ').trim();
             }
         """)
