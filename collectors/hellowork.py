@@ -16,40 +16,34 @@ HEADERS = {
 
 
 def _clean_page_text(full_text: str) -> str:
-    """Coupe le texte de la page avant les sections de suggestions/navigation
-    (utilisé uniquement en dernier recours, si l'extraction ciblée échoue)."""
     end_markers = [
         "ces offres pourraient aussi",
         "recherches similaires",
         "créez votre compte hellowork",
     ]
-
     lower_text = full_text.lower()
     cut_idx = len(full_text)
     for marker in end_markers:
         idx = lower_text.find(marker)
         if idx != -1 and idx < cut_idx:
             cut_idx = idx
-
     cleaned = full_text[:cut_idx].strip()
     cleaned = cleaned.replace("Aller au contenu principal", "")
-
     return cleaned.strip()
 
 
 def _extract_job_content_fast(soup: BeautifulSoup) -> str:
     """Extrait le contenu des accordéons 'Missions'/'Profil recherché',
-    ET le badge d'expérience (souvent hors accordéon, dans les métadonnées du poste,
-    ex: 'Exp. 7 ans min.' à côté de 'Bac +5', 'Secteur informatique'...)."""
+    ET le badge d'expérience (souvent hors accordéon, dans les métadonnées du poste)."""
     parts = []
 
-    # Badge d'expérience, situé dans les métadonnées en haut de page (hors accordéon)
+    # Badge d'expérience : re.search (pas re.match) pour tolérer un préfixe
+    # invisible (icône, espace insécable) avant "Exp."
     for li in soup.find_all("li"):
         li_text = li.get_text(strip=True)
-        if re.match(r"^exp\.?\s*\d", li_text, re.IGNORECASE):
+        if re.search(r"exp\.?\s*\d", li_text, re.IGNORECASE):
             parts.append(li_text)
 
-    # Contenu des accordéons Missions/Profil recherché
     for details in soup.find_all("details"):
         summary = details.find("summary")
         if not summary:
@@ -62,7 +56,6 @@ def _extract_job_content_fast(soup: BeautifulSoup) -> str:
 
 
 def _get_full_description_fast(url: str) -> str:
-    """Tente de récupérer la description via une simple requête HTTP (rapide, pas de navigateur)."""
     try:
         resp = requests.get(url, headers=HEADERS, timeout=8)
         if resp.status_code != 200:
@@ -80,8 +73,6 @@ def _get_full_description_fast(url: str) -> str:
 
 
 def _get_full_description(page, url: str) -> str:
-    """Récupère la description : essaie d'abord via requests (rapide),
-    retombe sur Playwright si nécessaire."""
     fast_result = _get_full_description_fast(url)
     if fast_result and len(fast_result) > 100:
         return fast_result
@@ -110,7 +101,7 @@ def _get_full_description(page, url: str) -> str:
                 const lis = Array.from(document.querySelectorAll('li'));
                 for (const li of lis) {
                     const t = (li.textContent || '').trim();
-                    if (/^exp\\.?\\s*\\d/i.test(t)) {
+                    if (/exp\\.?\\s*\\d/i.test(t)) {
                         parts.push(t);
                     }
                 }
