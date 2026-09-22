@@ -1,4 +1,3 @@
-from collectors.france_travail import fetch_offers as fetch_france_travail
 from collectors.hellowork import fetch_offers_batch
 from storage.db import init_db, save_offers, delete_old_offers
 from config import PROFILE
@@ -12,14 +11,7 @@ def run():
 
     total_new = 0
 
-    print("=== France Travail ===")
-    for title in PROFILE["job_titles"]:
-        offers = fetch_france_travail(title)
-        new_count = save_offers(offers)
-        total_new += new_count
-        print(f"{title}: {len(offers)} récupérées, {new_count} nouvelles")
-
-    print("\n=== HelloWork ===")
+    print("=== HelloWork ===")
     all_results = fetch_offers_batch(PROFILE["job_titles"])
     for title, offers in all_results.items():
         new_count = save_offers(offers)
@@ -28,5 +20,5 @@ def run():
 
     print(f"\nTotal nouvelles offres stockées : {total_new}")
 
-if __name__ == "__main__":
+if __name__ == "_main_":
     run()

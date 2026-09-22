@@ -50,9 +50,6 @@ jobs:
         run: playwright install-deps chromium
 
       - name: Lancer le scraping + scoring
-        env:
-          FT_CLIENT_ID: ${{ secrets.FT_CLIENT_ID }}
-          FT_CLIENT_SECRET: ${{ secrets.FT_CLIENT_SECRET }}
         run: python refresh.py
 
       - name: Commit la base mise à jour

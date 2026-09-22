@@ -3,7 +3,7 @@ import ollama
 import json
 from agent.tools import TOOLS, TOOL_FUNCTIONS
 
-MODEL_NAME = "qwen2.5:7b"  # ou qwen2.5:3b si tu veux tester la vitesse GPU
+MODEL_NAME = "qwen2.5:3b"  # ou qwen2.5:3b si tu veux tester la vitesse GPU
 
 st.set_page_config(page_title="Job Agent", page_icon="💼")
 st.title("💼 Assistant recherche d'emploi (local, Ollama)")
