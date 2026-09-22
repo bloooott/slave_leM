@@ -1,7 +1,9 @@
 from matching.embeddings import embed_text, cosine_similarity
 from storage.db import get_unscored_offers, get_connection
-from processing.filters import is_junior_friendly, is_junior_in_title
+from processing.filters import is_junior_friendly, is_junior_in_title, _extract_min_experience_years
 from config import CV_TEXT
+
+MALUS_PAR_ANNEE_EXPERIENCE = 0.05
 
 def score_all_offers():
     cv_vector = embed_text(CV_TEXT)
@@ -15,12 +17,19 @@ def score_all_offers():
             offer_vector = embed_text(offer_text)
             score = cosine_similarity(cv_vector, offer_vector)
 
-            # Bonus fort si "junior"/"débutant" apparaît dans le TITRE (signal explicite)
+            # Bonus si "junior"/"débutant" apparaît dans le TITRE (signal explicite)
             if is_junior_in_title(offer['title']):
                 score = min(score + 0.20, 1.0)
             # Bonus plus léger si mentionné seulement dans la description
             elif is_junior_friendly(offer['title'], offer['description']):
                 score = min(score + 0.10, 1.0)
+
+            # Malus proportionnel au nombre d'années d'expérience demandé
+            # (ex: 2 ans demandés -> -0.10, 0 ou pas d'info -> pas de malus)
+            years_required = _extract_min_experience_years(f"{offer['title']} {offer['description']}")
+            if years_required:
+                malus = years_required * MALUS_PAR_ANNEE_EXPERIENCE
+                score = max(score - malus, 0.0)
 
             conn.execute(
                 "UPDATE offers SET score = ? WHERE id = ?",
